@@ -1,4 +1,4 @@
-const fetch = require('node-fetch');
+constconst fetch = require('node-fetch');
 
 exports.handler = async (event) => {
   const headers = {
@@ -21,27 +21,30 @@ exports.handler = async (event) => {
   }
 
   try {
-    // ===== 환경변수 =====
+    /* ===============================
+       환경변수
+    =============================== */
     const {
-      DID_API_KEY,
-      KNOWLEDGE_ID,
       GITHUB_TOKEN,
-      GITHUB_USERNAME = 'jsggm03',
-      REPO_NAME = 'dementia-prevention-knowledge',
-      GITHUB_BRANCH = 'main'
+      GITHUB_USERNAME,
+      REPO_NAME,
+      GITHUB_BRANCH = 'main',
+      DID_API_KEY,
+      KNOWLEDGE_ID
     } = process.env;
 
     if (!GITHUB_TOKEN || !GITHUB_USERNAME || !REPO_NAME) {
       throw new Error('GitHub 환경변수가 누락되었습니다.');
     }
 
-    if (!DID_API_KEY || !KNOWLEDGE_ID) {
-      throw new Error('D-ID 환경변수가 누락되었습니다.');
-    }
-
-    // ===== 요청 데이터 =====
+    /* ===============================
+       요청 데이터
+    =============================== */
     const { userName, score, total, results, timestamp } = JSON.parse(event.body);
 
+    /* ===============================
+       파일 내용 (한글 OK)
+    =============================== */
     const resultDetails = results.map((r, i) =>
       `문제 ${i + 1}
 질문: ${r.question}
@@ -63,10 +66,15 @@ exports.handler = async (event) => {
 ${resultDetails}
 `.trim();
 
-    const fileName = `quiz_${encodeURIComponent(userName)}_${Date.now()}.txt`;
+    /* ===============================
+       파일명 (ASCII만 사용 → GitHub 안전)
+    =============================== */
+    const fileName = `quiz_${Date.now()}.txt`;
     const fileContentBase64 = Buffer.from(fileContent, 'utf-8').toString('base64');
 
-    // ===== GitHub 파일 생성 =====
+    /* ===============================
+       GitHub 파일 생성
+    =============================== */
     const githubUrl = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${fileName}`;
 
     const githubResponse = await fetch(githubUrl, {
@@ -77,8 +85,9 @@ ${resultDetails}
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        message: `Add quiz result from ${userName}`,
-        content: fileContentBase64
+        message: `Add quiz result (${userName})`,
+        content: fileContentBase64,
+        branch: GITHUB_BRANCH
       })
     });
 
@@ -97,48 +106,58 @@ ${resultDetails}
       };
     }
 
-    // ===== Raw URL =====
+    /* ===============================
+       Raw URL (D-ID용)
+    =============================== */
     const rawUrl = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/${GITHUB_BRANCH}/${fileName}`;
 
-    // ===== D-ID Knowledge 등록 =====
-    const didResponse = await fetch(
-      `https://api.d-id.com/knowledge/${KNOWLEDGE_ID}/documents`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Basic ${DID_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          documentType: 'text',
-          source_url: rawUrl,
-          title: `${userName}_치매예방퀴즈결과`
-        })
+    /* ===============================
+       D-ID Knowledge 등록 (선택)
+       ※ D-ID 환경변수 없으면 자동 스킵
+    =============================== */
+    if (DID_API_KEY && KNOWLEDGE_ID) {
+      const didResponse = await fetch(
+        `https://api.d-id.com/knowledge/${KNOWLEDGE_ID}/documents`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Basic ${DID_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            documentType: 'text',
+            source_url: rawUrl,
+            title: `${userName}_치매예방퀴즈결과`
+          })
+        }
+      );
+
+      const didText = await didResponse.text();
+      console.log('D-ID status:', didResponse.status);
+      console.log('D-ID response:', didText);
+
+      if (!didResponse.ok) {
+        return {
+          statusCode: 500,
+          headers,
+          body: JSON.stringify({
+            error: 'D-ID Knowledge 등록 실패',
+            detail: didText,
+            githubUrl: rawUrl
+          })
+        };
       }
-    );
-
-    const didText = await didResponse.text();
-    console.log('D-ID status:', didResponse.status);
-    console.log('D-ID response:', didText);
-
-    if (!didResponse.ok) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({
-          error: 'D-ID Knowledge 등록 실패',
-          detail: didText,
-          githubUrl: rawUrl
-        })
-      };
     }
 
+    /* ===============================
+       성공 응답
+    =============================== */
     return {
       statusCode: 200,
       headers,
       body: JSON.stringify({
         success: true,
-        message: '퀴즈 결과가 GitHub와 D-ID Knowledge에 저장되었습니다.',
+        message: '퀴즈 결과가 GitHub에 저장되었습니다.',
         githubUrl: rawUrl
       })
     };
