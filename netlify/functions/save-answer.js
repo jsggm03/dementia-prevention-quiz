@@ -1,5 +1,3 @@
-constconst fetch = require('node-fetch');
-
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -40,7 +38,8 @@ exports.handler = async (event) => {
     /* ===============================
        요청 데이터
     =============================== */
-    const { userName, score, total, results, timestamp } = JSON.parse(event.body);
+    const { userName, score, total, results, timestamp } =
+      JSON.parse(event.body);
 
     /* ===============================
        파일 내용 (한글 OK)
@@ -67,17 +66,19 @@ ${resultDetails}
 `.trim();
 
     /* ===============================
-       파일명 (ASCII만 사용 → GitHub 안전)
+       파일명 (ASCII만 사용)
     =============================== */
     const fileName = `quiz_${Date.now()}.txt`;
-    const fileContentBase64 = Buffer.from(fileContent, 'utf-8').toString('base64');
+    const fileContentBase64 =
+      Buffer.from(fileContent, 'utf-8').toString('base64');
 
     /* ===============================
        GitHub 파일 생성
     =============================== */
-    const githubUrl = `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${fileName}`;
+    const githubApiUrl =
+      `https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/${fileName}`;
 
-    const githubResponse = await fetch(githubUrl, {
+    const githubResponse = await fetch(githubApiUrl, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${GITHUB_TOKEN}`,
@@ -109,11 +110,12 @@ ${resultDetails}
     /* ===============================
        Raw URL (D-ID용)
     =============================== */
-    const rawUrl = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/${GITHUB_BRANCH}/${fileName}`;
+    const rawUrl =
+      `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/${GITHUB_BRANCH}/${fileName}`;
 
     /* ===============================
        D-ID Knowledge 등록 (선택)
-       ※ D-ID 환경변수 없으면 자동 스킵
+       → 환경변수 있으면 실행
     =============================== */
     if (DID_API_KEY && KNOWLEDGE_ID) {
       const didResponse = await fetch(
