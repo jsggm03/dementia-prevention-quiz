@@ -591,6 +591,12 @@
       const c = state.hwatu.recallCorrect;
 const total = 3;
 
+function renderFortuneMessage(){
+  const c = state.hwatu.recallCorrect;
+  const total = 3;
+
+  let title = "오늘의 기억 결과"; // ✅ 이 줄 추가
+  
 let msg = `
   오늘 기억 맞힌 카드 수는 <b>${c} / ${total}</b>장이에요.<br><br>
 `;
