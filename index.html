@@ -548,26 +548,39 @@
       const recallCount = document.getElementById("recallCount");
 
       grid.querySelectorAll("[data-idx]").forEach(el=>{
-        el.onclick = () => {
-          const idx = Number(el.dataset.idx);
-          const card = shuffledDeck[idx];
+  el.onclick = () => {
+    const idx = Number(el.dataset.idx);
+    const card = shuffledDeck[idx];
 
-          if(state.hwatu.recallPicked.some(x=>x.id===card.id)) return; // 중복 방지
-          if(state.hwatu.recallPicked.length >= 3) return;
+    // 1) 이미 선택된 카드면 "취소"
+    const foundIndex = state.hwatu.recallPicked.findIndex(x => x.id === card.id);
+    if (foundIndex !== -1) {
+      state.hwatu.recallPicked.splice(foundIndex, 1);
+      el.classList.remove("picked-outline");
+      recallCount.textContent = String(state.hwatu.recallPicked.length);
 
-          state.hwatu.recallPicked.push(card);
-          el.classList.add("picked-outline");
-          recallCount.textContent = String(state.hwatu.recallPicked.length);
+      // (선택이 3개 미만으로 줄었으니, 혹시 잠금이 걸렸다면 풀어줄 수도 있는데
+      //  현재 흐름에서는 3개가 되는 순간에만 잠금이 걸려서 별도 처리 필요 없음)
+      return;
+    }
 
-          if(state.hwatu.recallPicked.length === 3){
-            const pickedIds = new Set(state.hwatu.picked.map(x=>x.id));
-            state.hwatu.recallCorrect = state.hwatu.recallPicked.filter(x=>pickedIds.has(x.id)).length;
+    // 2) 아직 3개 미만이면 선택 추가
+    if (state.hwatu.recallPicked.length >= 3) return;
 
-            grid.querySelectorAll("[data-idx]").forEach(n=>n.style.pointerEvents="none");
-            setTimeout(renderFortuneMessage, 600);
-          }
-        };
-      });
+    state.hwatu.recallPicked.push(card);
+    el.classList.add("picked-outline");
+    recallCount.textContent = String(state.hwatu.recallPicked.length);
+
+    // 3) 3개가 되면 채점 후 다음 단계
+    if (state.hwatu.recallPicked.length === 3) {
+      const pickedIds = new Set(state.hwatu.picked.map(x => x.id));
+      state.hwatu.recallCorrect = state.hwatu.recallPicked.filter(x => pickedIds.has(x.id)).length;
+
+      grid.querySelectorAll("[data-idx]").forEach(n => n.style.pointerEvents = "none");
+      setTimeout(renderFortuneMessage, 600);
+    }
+  };
+});
     }
 
     /* =========================
