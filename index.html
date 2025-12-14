@@ -103,7 +103,12 @@
     .face img{ width:100%; height:100%; object-fit:cover; display:block; }
     .front{ transform:rotateY(180deg); }
 
-    .picked-outline{ outline:4px solid #667eea; border-radius:16px; }
+    /* 선택 부각 (요청 반영: 직관적으로 보이게) */
+    .picked-outline{
+      outline:5px solid #667eea;
+      border-radius:16px;
+      transform:scale(1.06);
+    }
     .muted{ opacity:0.55; }
 
     .img-row{
@@ -122,8 +127,9 @@
       object-fit:cover;
     }
 
-    /* Options */
-    .q-title{ font-size:1.18em; color:#222; margin-bottom:10px; line-height:1.6; }
+    /* Quiz options */
+    .q-block{ margin-top:14px; padding-top:6px; }
+    .q-title{ font-size:1.16em; color:#222; margin:10px 0; line-height:1.6; font-weight:700; }
     .options{ display:flex; flex-direction:column; gap:10px; margin-top:10px; }
     .option{
       padding:14px 14px;
@@ -132,7 +138,7 @@
       background:#fafbfc;
       cursor:pointer;
       transition:all 0.15s ease;
-      font-size:1.08em;
+      font-size:1.06em;
       color:#222;
       user-select:none;
     }
@@ -177,6 +183,17 @@
     .status.success{ background:#d4edda; color:#155724; border:2px solid #28a745; }
     .status.error{ background:#f8d7da; color:#721c24; border:2px solid #dc3545; }
 
+    .score-box{
+      margin-top:12px;
+      padding:14px;
+      border-radius:12px;
+      background:#f6f7fb;
+      border:1px solid #e6e8f0;
+      color:#222;
+      line-height:1.7;
+      font-size:1.05em;
+    }
+
     @media (max-width: 600px){
       .grid{ grid-template-columns:repeat(3, 1fr); gap:14px; }
       .flip-card{ width:104px; height:160px; }
@@ -191,7 +208,7 @@
     <div id="app"></div>
   </div>
 
-  <!-- D-ID 아바타 (사용자 제공 값 반영) -->
+  <!-- D-ID 아바타 -->
   <script type="module"
     src="https://agent.d-id.com/v2/index.js"
     data-mode="fabio"
@@ -226,8 +243,7 @@
     ];
 
     /* =========================
-      낱말 퀴즈 (5문항)
-      - 어르신이 “모를만한 단어” + 쉬운 설명
+      ✅ 사용자 확정본: 낱말 퀴즈 (그대로 반영)
     ========================= */
     const wordQuizData = [
       {
@@ -263,7 +279,7 @@
     ];
 
     /* =========================
-      치매 예방 퀴즈 (5문항 + 해설)
+      ✅ 사용자 확정본: 치매 예방 퀴즈 (그대로 반영)
     ========================= */
     const dementiaQuizData = [
       {
@@ -334,7 +350,6 @@
 
     function nowISO(){ return new Date().toISOString(); }
     function newSessionId(){
-      // YYYYMMDD_HHMMSS
       const d = new Date();
       const pad = n => String(n).padStart(2,"0");
       return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
@@ -357,7 +372,7 @@
     }
 
     /* =========================
-      화면 렌더
+      화면: 시작
     ========================= */
     function renderIntro(){
       app.innerHTML = `
@@ -378,17 +393,19 @@
       document.getElementById("startBtn").onclick = () => {
         const name = document.getElementById("nameInput").value.trim();
         if(!name){ alert("이름을 입력해주세요."); return; }
+
         state.userName = name;
         state.sessionId = newSessionId();
         state.startISO = nowISO();
 
-        // reset module states
         state.hwatu.picked = [];
         state.hwatu.recallPicked = [];
         state.hwatu.recallCorrect = 0;
+
         state.word.answers = Array(wordQuizData.length).fill(null);
         state.word.results = [];
         state.word.score = 0;
+
         state.dementia.answers = Array(dementiaQuizData.length).fill(null);
         state.dementia.results = [];
         state.dementia.score = 0;
@@ -409,12 +426,12 @@
           <div class="title">오늘의 화투 운세 & 기억 훈련</div>
           <div class="desc">
             마음에 드는 카드 <b>세 장</b>을 골라주세요.<br>
-            고르는 동안 자연스럽게 머리를 쓰게 됩니다.
+            고른 카드가 파랗게 표시되면 선택이 된 거예요.
           </div>
 
           <div class="grid" id="hwatuGrid">
             ${shuffledDeck.map((c, idx) => `
-              <div class="flip-card" data-idx="${idx}">
+              <div class="flip-card" data-idx="${idx}" aria-label="${escapeHtml(c.label)}">
                 <div class="flip-inner">
                   <div class="face back">
                     <img src="${BACK_IMG}" alt="back">
@@ -441,11 +458,12 @@
           const idx = Number(cardEl.dataset.idx);
           const card = shuffledDeck[idx];
 
-          // 중복 방지
-          if(state.hwatu.picked.some(x=>x.id===card.id)) return;
+          if(state.hwatu.picked.some(x=>x.id===card.id)) return; // 중복 방지
           if(state.hwatu.picked.length >= 3) return;
 
           state.hwatu.picked.push(card);
+
+          // 뒤집기 + 선택 부각
           cardEl.classList.add("flipped","picked-outline");
           pickedCount.textContent = String(state.hwatu.picked.length);
 
@@ -491,7 +509,7 @@
     }
 
     /* =========================
-      3) 화투: 회상(앞면 12장 랜덤 배치) → 방금 뽑은 3장 다시 클릭
+      3) 화투: 회상(앞면 12장 랜덤) → 방금 뽑은 3장 다시 클릭
     ========================= */
     function renderHwatuRecall(){
       state.hwatu.recallStartAt = performance.now();
@@ -512,7 +530,7 @@
 
           <div class="grid" id="recallGrid">
             ${shuffledDeck.map((c, idx)=>`
-              <div class="flip-card picked-outline" style="outline:none; box-shadow:none; cursor:pointer;" data-idx="${idx}">
+              <div class="flip-card" data-idx="${idx}" style="perspective:none;">
                 <div class="face" style="position:relative; width:122px; height:188px; border-radius:14px; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,0.12);">
                   <img src="${c.img}" alt="${escapeHtml(c.label)}">
                 </div>
@@ -534,7 +552,7 @@
           const idx = Number(el.dataset.idx);
           const card = shuffledDeck[idx];
 
-          if(state.hwatu.recallPicked.some(x=>x.id===card.id)) return;
+          if(state.hwatu.recallPicked.some(x=>x.id===card.id)) return; // 중복 방지
           if(state.hwatu.recallPicked.length >= 3) return;
 
           state.hwatu.recallPicked.push(card);
@@ -542,13 +560,10 @@
           recallCount.textContent = String(state.hwatu.recallPicked.length);
 
           if(state.hwatu.recallPicked.length === 3){
-            // 정확도 계산
             const pickedIds = new Set(state.hwatu.picked.map(x=>x.id));
             state.hwatu.recallCorrect = state.hwatu.recallPicked.filter(x=>pickedIds.has(x.id)).length;
 
-            // 클릭 잠금
             grid.querySelectorAll("[data-idx]").forEach(n=>n.style.pointerEvents="none");
-
             setTimeout(renderFortuneMessage, 600);
           }
         };
@@ -556,7 +571,7 @@
     }
 
     /* =========================
-      4) 행운 메시지 + 다음 활동 권장 (회상 결과에 따라)
+      4) 행운 메시지 + 다음 활동 권장
     ========================= */
     function renderFortuneMessage(){
       const c = state.hwatu.recallCorrect;
@@ -597,28 +612,15 @@
         </div>
       `;
 
-      document.getElementById("toWordBtn").onclick = () => renderWordQuiz(0);
+      document.getElementById("toWordBtn").onclick = () => renderWordQuizPage();
     }
 
     /* =========================
-      5) 낱말 퀴즈 (단일선택, 5문항)
+      5) 낱말 퀴즈: 5문항 한 페이지 → 제출 → 결과/코멘트
     ========================= */
-    function renderWordQuiz(index){
-      const total = wordQuizData.length;
-
-      // 완료 시 치매예방 퀴즈로
-      if(index >= total){
-        computeWordResults();
-        renderDementiaQuiz(0);
-        return;
-      }
-
-      const q = wordQuizData[index];
-      const picked = state.word.answers[index];
-
+    function renderWordQuizPage(){
       app.innerHTML = `
         <div class="card">
-          <div class="pill">낱말 퀴즈 ${index+1} / ${total}</div>
           <div class="title">단어를 한 번 생각해볼까요?</div>
           <div class="desc">
             단어 뜻을 떠올리는 시간입니다.<br>
@@ -627,36 +629,48 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="q-title">${escapeHtml(q.question)}</div>
-          <div class="options" id="wordOpts">
-            ${q.options.map((opt, i)=>`
-              <div class="option ${picked===i ? "selected":""}" data-i="${i}">
-                ${escapeHtml(opt)}
+        <div class="card" id="wordForm">
+          ${wordQuizData.map((q, qi)=>`
+            <div class="q-block">
+              <div class="q-title">${qi+1}. ${escapeHtml(q.question)}</div>
+              <div class="options" data-q="${qi}">
+                ${q.options.map((opt, oi)=>`
+                  <div class="option" data-oi="${oi}">${escapeHtml(opt)}</div>
+                `).join("")}
               </div>
-            `).join("")}
-          </div>
+            </div>
+          `).join("")}
 
-          <button class="btn" id="wordNextBtn" ${picked===null ? "disabled":""}>
-            ${index === total-1 ? "다음(치매 예방 퀴즈로)" : "다음"}
-          </button>
+          <button class="btn" id="wordSubmitBtn" disabled>제출하기</button>
         </div>
       `;
 
-      const opts = document.getElementById("wordOpts");
-      const btn = document.getElementById("wordNextBtn");
+      const form = document.getElementById("wordForm");
+      const submitBtn = document.getElementById("wordSubmitBtn");
 
-      opts.querySelectorAll(".option").forEach(el=>{
-        el.onclick = () => {
-          const i = Number(el.dataset.i);
-          state.word.answers[index] = i;
-          opts.querySelectorAll(".option").forEach(x=>x.classList.remove("selected"));
-          el.classList.add("selected");
-          btn.disabled = false;
-        };
+      form.querySelectorAll(".options").forEach(optGroup=>{
+        optGroup.addEventListener("click", (e)=>{
+          const target = e.target;
+          if(!target.classList.contains("option")) return;
+
+          const qIndex = Number(optGroup.dataset.q);
+          const oIndex = Number(target.dataset.oi);
+
+          state.word.answers[qIndex] = oIndex;
+
+          optGroup.querySelectorAll(".option").forEach(x=>x.classList.remove("selected"));
+          target.classList.add("selected");
+
+          // 전부 선택되면 제출 활성화
+          const done = state.word.answers.every(v => v !== null);
+          submitBtn.disabled = !done;
+        });
       });
 
-      btn.onclick = () => renderWordQuiz(index+1);
+      submitBtn.onclick = () => {
+        computeWordResults();
+        renderWordResult();
+      };
     }
 
     function computeWordResults(){
@@ -684,24 +698,45 @@
       state.word.score = score;
     }
 
-    /* =========================
-      6) 치매 예방 퀴즈 (단일선택, 5문항) + 끝나면 결과/해설 표시
-    ========================= */
-    function renderDementiaQuiz(index){
-      const total = dementiaQuizData.length;
+    function renderWordResult(){
+      const total = wordQuizData.length;
+      const score = state.word.score;
 
-      if(index >= total){
-        computeDementiaResults();
-        renderDementiaReview();
-        return;
+      let comment = "";
+      if(score === total){
+        comment = `단어 뜻을 아주 또렷하게 잘 떠올리셨어요.<br>이런 활동이 말과 기억을 튼튼하게 도와줍니다.`;
+      }else if(score >= 3){
+        comment = `아주 잘 하셨어요.<br>몇 개가 헷갈려도 괜찮습니다. 오늘처럼 생각해보는 시간이 중요합니다.`;
+      }else{
+        comment = `괜찮아요. 낱말은 그날그날 컨디션에 따라 달라질 수 있어요.<br>천천히 끝까지 해보신 것만으로도 충분히 잘 하셨습니다.`;
       }
-
-      const q = dementiaQuizData[index];
-      const picked = state.dementia.answers[index];
 
       app.innerHTML = `
         <div class="card">
-          <div class="pill">치매 예방 퀴즈 ${index+1} / ${total}</div>
+          <div class="title">낱말 퀴즈 결과</div>
+          <div class="desc">
+            단어를 떠올리려고 생각해보신 것만으로도<br>
+            머리는 이미 충분히 운동을 했습니다.<br><br>
+            맞고 틀림보다, 이렇게 한 번 더 생각해보는 시간이<br>
+            치매 예방에 큰 도움이 됩니다.
+          </div>
+          <div class="score-box">
+            <b>점수:</b> ${score} / ${total}<br>
+            ${comment}
+          </div>
+          <button class="btn" id="toDementiaBtn">치매 예방 퀴즈로 가기</button>
+        </div>
+      `;
+
+      document.getElementById("toDementiaBtn").onclick = () => renderDementiaQuizPage();
+    }
+
+    /* =========================
+      6) 치매 예방 퀴즈: 5문항 한 페이지 → 제출 → 해설/결과
+    ========================= */
+    function renderDementiaQuizPage(){
+      app.innerHTML = `
+        <div class="card">
           <div class="title">머리에 좋은 이야기 한 번 살펴볼까요?</div>
           <div class="desc">
             지금부터는 머리를 건강하게 쓰는 데 도움이 되는 생활 이야기입니다.<br>
@@ -710,36 +745,47 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="q-title">${escapeHtml(q.question)}</div>
-          <div class="options" id="demOpts">
-            ${q.options.map((opt, i)=>`
-              <div class="option ${picked===i ? "selected":""}" data-i="${i}">
-                ${escapeHtml(opt)}
+        <div class="card" id="demForm">
+          ${dementiaQuizData.map((q, qi)=>`
+            <div class="q-block">
+              <div class="q-title">${qi+1}. ${escapeHtml(q.question)}</div>
+              <div class="options" data-q="${qi}">
+                ${q.options.map((opt, oi)=>`
+                  <div class="option" data-oi="${oi}">${escapeHtml(opt)}</div>
+                `).join("")}
               </div>
-            `).join("")}
-          </div>
+            </div>
+          `).join("")}
 
-          <button class="btn" id="demNextBtn" ${picked===null ? "disabled":""}>
-            ${index === total-1 ? "제출하고 해설 보기" : "다음"}
-          </button>
+          <button class="btn" id="demSubmitBtn" disabled>제출하고 해설 보기</button>
         </div>
       `;
 
-      const opts = document.getElementById("demOpts");
-      const btn = document.getElementById("demNextBtn");
+      const form = document.getElementById("demForm");
+      const submitBtn = document.getElementById("demSubmitBtn");
 
-      opts.querySelectorAll(".option").forEach(el=>{
-        el.onclick = () => {
-          const i = Number(el.dataset.i);
-          state.dementia.answers[index] = i;
-          opts.querySelectorAll(".option").forEach(x=>x.classList.remove("selected"));
-          el.classList.add("selected");
-          btn.disabled = false;
-        };
+      form.querySelectorAll(".options").forEach(optGroup=>{
+        optGroup.addEventListener("click", (e)=>{
+          const target = e.target;
+          if(!target.classList.contains("option")) return;
+
+          const qIndex = Number(optGroup.dataset.q);
+          const oIndex = Number(target.dataset.oi);
+
+          state.dementia.answers[qIndex] = oIndex;
+
+          optGroup.querySelectorAll(".option").forEach(x=>x.classList.remove("selected"));
+          target.classList.add("selected");
+
+          const done = state.dementia.answers.every(v => v !== null);
+          submitBtn.disabled = !done;
+        });
       });
 
-      btn.onclick = () => renderDementiaQuiz(index+1);
+      submitBtn.onclick = () => {
+        computeDementiaResults();
+        renderDementiaReviewAndSave();
+      };
     }
 
     function computeDementiaResults(){
@@ -767,18 +813,35 @@
       state.dementia.score = score;
     }
 
-    function renderDementiaReview(){
+    function renderDementiaReviewAndSave(){
+      const total = dementiaQuizData.length;
+      const score = state.dementia.score;
+
+      let comment = "";
+      if(score === total){
+        comment = `오늘 내용이 아주 또렷하게 잘 들어오셨어요.<br>이런 지식은 자주 볼수록 더 단단해집니다.`;
+      }else if(score >= 3){
+        comment = `잘 하셨어요.<br>몇 개가 헷갈려도 괜찮습니다. 해설을 읽어보는 것이 더 중요합니다.`;
+      }else{
+        comment = `괜찮습니다.<br>지식은 한 번에 다 외우는 게 아니라, 자주 접하면서 익숙해지는 거예요.`;
+      }
+
       app.innerHTML = `
         <div class="card">
-          <div class="title">해설을 함께 볼까요?</div>
+          <div class="title">치매 예방 퀴즈 결과</div>
           <div class="desc">
-            정답을 맞히는 것도 좋지만,<br>
-            <b>해설을 읽어보는 것</b> 자체가 두뇌 활동이 됩니다.
+            오늘은 머리에 좋은 이야기를 차분히 살펴보셨습니다.<br>
+            모든 내용을 다 기억하지 않아도 괜찮습니다.<br>
+            이렇게 자주 접하는 것이 가장 큰 도움이 됩니다.
+          </div>
+          <div class="score-box">
+            <b>점수:</b> ${score} / ${total}<br>
+            ${comment}
           </div>
         </div>
 
         ${state.dementia.results.map((r, idx)=>`
-          <div class="card" id="r-${idx}">
+          <div class="card">
             <div class="pill">문제 ${idx+1}</div>
             <div class="q-title">${escapeHtml(r.question)}</div>
             <div class="options">
@@ -813,7 +876,8 @@
     }
 
     /* =========================
-      7) 저장: 모든 결과를 한 번에 전송 → Netlify Function이 문서 생성/업로드/D-ID 등록
+      7) 저장: 화투+낱말+치매예방 결과 전송
+      (save-answer.js는 이전에 드린 최종본 그대로 사용)
     ========================= */
     async function saveAll(){
       const btn = document.getElementById("saveBtn");
@@ -824,7 +888,6 @@
 
       state.endISO = nowISO();
 
-      // 시간 계산(참고용)
       const memoryElapsedMs = Math.max(0, Math.round(performance.now() - state.hwatu.memoryStartAt));
       const recallElapsedMs  = Math.max(0, Math.round(performance.now() - state.hwatu.recallStartAt));
 
@@ -879,12 +942,11 @@
 
         status.className = "status show success";
         status.innerHTML = `✅ ${escapeHtml(state.userName)}님, 오늘 결과가 저장되었습니다.<br>
-          다음에 다시 해보시면 변화도 함께 볼 수 있어요.<br><br>
+          아바타에게 결과를 물어보셔도 됩니다.<br><br>
           ${data.githubUrl ? `기록 파일: ${escapeHtml(data.githubUrl)}` : ""}`;
 
         btn.textContent = "✅ 저장 완료";
 
-        // 저장 완료 화면 + 다시하기
         setTimeout(()=>renderDone(data.githubUrl), 900);
 
       }catch(err){
@@ -902,14 +964,13 @@
           <div class="desc">
             오늘 하신 두뇌 활동이 <b>기록으로 저장</b>되었습니다.<br><br>
             이런 활동은 하루에 한 번이면 충분합니다.<br>
-            내일 또 생각나면 한 번 더 해보셔도 좋아요.<br><br>
+            다음에 다시 해보시면 변화도 비교할 수 있어요.<br><br>
             ${githubUrl ? `<span style="color:#666;">(저장 파일: ${escapeHtml(githubUrl)})</span>` : ""}
           </div>
           <button class="btn" id="restartBtn">처음 화면으로 돌아가기</button>
         </div>
       `;
       document.getElementById("restartBtn").onclick = () => {
-        // 프로토타입 반복 테스트/비교를 위해 새 세션 시작
         renderIntro();
       };
     }
