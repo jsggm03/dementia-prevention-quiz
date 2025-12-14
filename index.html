@@ -17,7 +17,7 @@
     h1 {
       text-align: center;
       color: white;
-      font-size: 2.3em;
+      font-size: 2.4em;
       margin-bottom: 30px;
       text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
     }
@@ -28,7 +28,7 @@
       margin-bottom: 20px;
       box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
-    .input-box input {
+    input {
       width: 100%;
       padding: 15px;
       font-size: 1.2em;
@@ -39,6 +39,7 @@
       font-size: 1.4em;
       margin-bottom: 20px;
       text-align: center;
+      line-height: 1.6;
     }
     .options {
       display: flex;
@@ -67,15 +68,15 @@
       color: white;
       background: linear-gradient(135deg, #667eea, #764ba2);
     }
-    .btn.secondary {
-      background: #6c757d;
-    }
+    .btn.secondary { background: #6c757d; }
     .hidden { display: none; }
-    .result {
-      margin-top: 20px;
+    .status {
       text-align: center;
-      font-size: 1.3em;
+      font-size: 1.2em;
+      margin-top: 15px;
     }
+    .success { color: #155724; }
+    .error { color: #721c24; }
   </style>
 </head>
 
@@ -85,15 +86,17 @@
   <h1>🧠 인지 자극 기억 회상 게임</h1>
 
   <!-- 사용자 이름 -->
-  <div class="card input-box">
-    <input type="text" id="userName" placeholder="이름을 입력하세요">
+  <div class="card">
+    <input type="text" id="userName" placeholder="이름을 입력해주세요">
   </div>
 
   <!-- 기억 제시 화면 -->
   <div class="card" id="memoryScreen">
     <div class="question">아래 단어를 10초 동안 기억해주세요</div>
     <div id="memoryWords" style="font-size:1.6em; text-align:center;"></div>
-    <div style="margin-top:15px; text-align:center;">⏱️ <span id="timer">10</span>초</div>
+    <div style="margin-top:15px; text-align:center;">
+      ⏱️ <span id="timer">10</span>초
+    </div>
   </div>
 
   <!-- 문제 화면 -->
@@ -102,10 +105,10 @@
     <div class="options" id="options"></div>
   </div>
 
-  <button class="btn hidden" id="submitBtn" onclick="submitAnswers()">결과 확인</button>
-  <button class="btn secondary hidden" onclick="resetGame()">🔄 다시 풀기</button>
+  <button class="btn hidden" id="submitBtn" onclick="submitAnswers()">결과 제출</button>
+  <button class="btn secondary hidden" id="resetBtn" onclick="resetGame()">🔄 다시 풀기</button>
 
-  <div class="card hidden result" id="resultBox"></div>
+  <div class="card hidden status" id="statusBox"></div>
 
 </div>
 
@@ -121,19 +124,24 @@
 </script>
 
 <script>
-  const memoryWords = ["사과", "의자", "시계", "강아지", "자동차"];
-  const options = ["사과", "연필", "시계", "비행기", "강아지"];
-  const correctAnswers = [0, 2, 4];
+  /* ================= 연구용 설정 ================= */
+  const MEMORY_WORDS = ["사과", "의자", "시계", "강아지", "자동차"];
+  const OPTIONS = ["사과", "연필", "시계", "비행기", "강아지"];
+  const CORRECT_INDEXES = [0, 2, 4];
+  const MEMORY_TIME = 10;
 
   let selected = [];
 
+  /* ================= 기억 단계 ================= */
   function startMemoryPhase() {
-    document.getElementById("memoryWords").textContent = memoryWords.join(" · ");
-    let time = 10;
+    document.getElementById("memoryWords").textContent = MEMORY_WORDS.join(" · ");
+    let time = MEMORY_TIME;
+    document.getElementById("timer").textContent = time;
+
     const timer = setInterval(() => {
       time--;
       document.getElementById("timer").textContent = time;
-      if (time === 0) {
+      if (time <= 0) {
         clearInterval(timer);
         document.getElementById("memoryScreen").classList.add("hidden");
         showQuiz();
@@ -141,6 +149,7 @@
     }, 1000);
   }
 
+  /* ================= 문제 화면 ================= */
   function showQuiz() {
     document.getElementById("quizScreen").classList.remove("hidden");
     document.getElementById("submitBtn").classList.remove("hidden");
@@ -148,11 +157,11 @@
     const optionBox = document.getElementById("options");
     optionBox.innerHTML = "";
 
-    options.forEach((word, index) => {
+    OPTIONS.forEach((word, idx) => {
       const div = document.createElement("div");
       div.className = "option";
       div.textContent = word;
-      div.onclick = () => toggleOption(div, index);
+      div.onclick = () => toggleOption(div, idx);
       optionBox.appendChild(div);
     });
   }
@@ -167,10 +176,17 @@
     }
   }
 
-  function submitAnswers() {
+  /* ================= 결과 제출 & 저장 ================= */
+  async function submitAnswers() {
+    const userName = document.getElementById("userName").value.trim();
+    if (!userName) {
+      alert("이름을 입력해주세요.");
+      return;
+    }
+
     let score = 0;
     document.querySelectorAll(".option").forEach((el, idx) => {
-      if (correctAnswers.includes(idx)) {
+      if (CORRECT_INDEXES.includes(idx)) {
         el.classList.add("correct");
         if (selected.includes(idx)) score++;
       } else if (selected.includes(idx)) {
@@ -178,21 +194,51 @@
       }
     });
 
-    document.getElementById("resultBox").classList.remove("hidden");
-    document.getElementById("resultBox").innerHTML =
-      `기억한 단어 ${score} / ${correctAnswers.length}개<br>
-       <small>본 과제는 인지 기능 자극을 위한 연구용 프로토타입입니다.</small>`;
+    const resultData = {
+      userName,
+      taskType: "Immediate Word Recall",
+      memoryWords: MEMORY_WORDS,
+      selectedAnswers: selected.map(i => OPTIONS[i]),
+      correctAnswers: CORRECT_INDEXES.map(i => OPTIONS[i]),
+      score,
+      total: CORRECT_INDEXES.length,
+      timestamp: new Date().toISOString()
+    };
+
+    const statusBox = document.getElementById("statusBox");
+    statusBox.classList.remove("hidden");
+    statusBox.textContent = "⏳ 결과를 저장 중입니다...";
+
+    try {
+      const response = await fetch("/.netlify/functions/save-answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(resultData)
+      });
+
+      if (!response.ok) throw new Error();
+
+      statusBox.innerHTML =
+        `✅ 결과가 저장되었습니다.<br>
+         <small>아바타에게 오늘의 수행 결과를 물어보세요.</small>`;
+      statusBox.className = "card status success";
+
+    } catch {
+      statusBox.textContent = "⚠️ 결과 저장 중 오류가 발생했습니다.";
+      statusBox.className = "card status error";
+    }
 
     document.getElementById("submitBtn").classList.add("hidden");
+    document.getElementById("resetBtn").classList.remove("hidden");
   }
 
+  /* ================= 다시 풀기 ================= */
   function resetGame() {
     selected = [];
     document.getElementById("quizScreen").classList.add("hidden");
-    document.getElementById("resultBox").classList.add("hidden");
-    document.querySelector("button.secondary").classList.add("hidden");
+    document.getElementById("statusBox").classList.add("hidden");
+    document.getElementById("resetBtn").classList.add("hidden");
     document.getElementById("memoryScreen").classList.remove("hidden");
-    document.getElementById("timer").textContent = "10";
     startMemoryPhase();
   }
 
